@@ -4,7 +4,6 @@ DeepFace helper functions for face recognition and analysis.
 
 from typing import Dict, List, Optional, Tuple
 from deepface import DeepFace
-import os
 
 
 # Available models in DeepFace

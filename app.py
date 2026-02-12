@@ -322,6 +322,28 @@ def render_facial_analysis(model_name):
             st.info("📸 Please capture a photo using the camera to proceed.")
 
 
+
+
+def get_or_extract_face_candidates(cache_prefix: str, img_path: str, model_name: str):
+    """Get cached face candidates for an image/model pair or extract them."""
+    image_key = f"{cache_prefix}_img_path"
+    model_key = f"{cache_prefix}_model_name"
+    faces_key = f"{cache_prefix}_face_candidates"
+
+    should_refresh = (
+        st.session_state.get(image_key) != img_path
+        or st.session_state.get(model_key) != model_name
+        or faces_key not in st.session_state
+    )
+
+    if should_refresh:
+        st.session_state[faces_key] = extract_embeddings(img_path, model_name=model_name)
+        st.session_state[image_key] = img_path
+        st.session_state[model_key] = model_name
+
+    return st.session_state[faces_key]
+
+
 def render_face_search(model_name):
     """Render the face search feature."""
     st.markdown("## 🔎 Face Search")
@@ -371,7 +393,7 @@ PINECONE_INDEX_NAME=face-recognition-index
         display_image_with_info(img_path, width=300)
 
         try:
-            face_candidates = extract_embeddings(img_path, model_name=model_name)
+            face_candidates = get_or_extract_face_candidates("search", img_path, model_name)
         except Exception as e:
             st.error(f"❌ Error detecting faces: {str(e)}")
             return
@@ -387,6 +409,7 @@ PINECONE_INDEX_NAME=face-recognition-index
             )
 
         selected_face = face_candidates[selected_face_idx]
+        st.caption(f"Selected face area: {selected_face.get('facial_area', {})}")
 
         if st.button("🔍 Search Similar Faces", type="primary"):
             with st.spinner("Searching..."):
@@ -467,7 +490,7 @@ def render_face_registration(model_name):
             display_image_with_info(img_path)
 
         try:
-            face_candidates = extract_embeddings(img_path, model_name=model_name)
+            face_candidates = get_or_extract_face_candidates("register", img_path, model_name)
         except Exception as e:
             st.error(f"❌ Error detecting faces: {str(e)}")
             return
@@ -483,6 +506,7 @@ def render_face_registration(model_name):
             )
 
         selected_face = face_candidates[selected_face_idx]
+        st.caption(f"Selected face area: {selected_face.get('facial_area', {})}")
 
         with col2:
             st.markdown("### 📝 Face Information")
