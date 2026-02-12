@@ -6,6 +6,7 @@ from .deepface_helper import (
     verify_faces,
     analyze_face,
     extract_embedding,
+    extract_embeddings,
     detect_faces,
     get_available_models
 )
@@ -20,6 +21,7 @@ __all__ = [
     'verify_faces',
     'analyze_face',
     'extract_embedding',
+    'extract_embeddings',
     'detect_faces',
     'get_available_models',
     'save_uploaded_file',

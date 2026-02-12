@@ -143,6 +143,50 @@ def extract_embedding(
         raise Exception(f"Embedding extraction failed: {str(e)}")
 
 
+def extract_embeddings(
+    img_path: str,
+    model_name: str = DEFAULT_MODEL,
+    detector_backend: str = "opencv"
+) -> List[Dict]:
+    """
+    Extract embeddings for all detected faces from an image.
+
+    Args:
+        img_path: Path to image
+        model_name: Face recognition model to use
+        detector_backend: Face detection backend
+
+    Returns:
+        List of dictionaries with:
+        - face_index: Stable index for face selection in UI
+        - embedding: Face embedding vector
+        - facial_area: Bounding box details
+    """
+    try:
+        results = DeepFace.represent(
+            img_path=img_path,
+            model_name=model_name,
+            detector_backend=detector_backend,
+            enforce_detection=True
+        )
+
+        if not results:
+            raise Exception("No faces detected in the image")
+
+        embeddings = []
+        for idx, face_result in enumerate(results):
+            embeddings.append({
+                "face_index": idx,
+                "embedding": face_result.get("embedding"),
+                "facial_area": face_result.get("facial_area", {})
+            })
+
+        return embeddings
+
+    except Exception as e:
+        raise Exception(f"Multi-face embedding extraction failed: {str(e)}")
+
+
 def detect_faces(
     img_path: str,
     detector_backend: str = "opencv",

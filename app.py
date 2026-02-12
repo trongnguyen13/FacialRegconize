@@ -12,7 +12,7 @@ import uuid
 from utils.deepface_helper import (
     verify_faces,
     analyze_face,
-    extract_embedding,
+    extract_embeddings,
     detect_faces,
     get_available_models,
     get_model_info
@@ -326,7 +326,7 @@ def render_face_search(model_name):
     """Render the face search feature."""
     st.markdown("## 🔎 Face Search")
     st.markdown("Search for similar faces in your Pinecone database.")
-    
+
     if not st.session_state.pinecone_helper:
         st.warning("⚠️ Pinecone is not configured. Please add your API key to the `.env` file and restart the app.")
         st.code("""
@@ -335,7 +335,7 @@ PINECONE_API_KEY=your_api_key_here
 PINECONE_INDEX_NAME=face-recognition-index
         """)
         return
-    
+
     st.markdown("### 📷 Choose Input Method")
     input_method = st.radio(
         "Select how to capture the query image:",
@@ -344,48 +344,63 @@ PINECONE_INDEX_NAME=face-recognition-index
         key="search_input_method",
         label_visibility="collapsed"
     )
-    
+
     img_path = None
-    
+
     # File upload method
     if input_method == "📁 Upload Image File":
         uploaded_file = st.file_uploader("Upload Query Image", type=['jpg', 'jpeg', 'png'], key="search_img", label_visibility="collapsed")
         if uploaded_file:
             img_path = save_uploaded_file(uploaded_file)
-    
+
     # Camera capture method
     else:
         st.markdown("📸 **Camera Capture**")
         camera_photo = st.camera_input("Capture query image", key="camera_search", label_visibility="collapsed")
         if camera_photo:
             img_path = save_uploaded_file(camera_photo)
-    
+
     col1, col2 = st.columns([1, 2])
-    
+
     with col1:
         top_k = st.slider("Number of Results", 1, 10, 5)
         threshold = st.slider("Similarity Threshold", 0.0, 1.0, 0.5, 0.05)
-    
+
     if img_path:
         st.markdown("### 📸 Query Image")
         display_image_with_info(img_path, width=300)
-        
+
+        try:
+            face_candidates = extract_embeddings(img_path, model_name=model_name)
+        except Exception as e:
+            st.error(f"❌ Error detecting faces: {str(e)}")
+            return
+
+        selected_face_idx = 0
+        if len(face_candidates) > 1:
+            st.info(f"Detected **{len(face_candidates)}** faces. Please select one for search.")
+            selected_face_idx = st.selectbox(
+                "Choose a face",
+                options=list(range(len(face_candidates))),
+                format_func=lambda idx: f"Face {idx + 1}",
+                key="search_face_selector"
+            )
+
+        selected_face = face_candidates[selected_face_idx]
+
         if st.button("🔍 Search Similar Faces", type="primary"):
             with st.spinner("Searching..."):
                 try:
-                    # Extract embedding
-                    embedding, _ = extract_embedding(img_path, model_name=model_name)
-                    
-                    # Search in Pinecone
+                    # Search in Pinecone with selected face embedding
                     matches = st.session_state.pinecone_helper.search_faces(
-                        query_embedding=embedding,
+                        query_embedding=selected_face["embedding"],
                         top_k=top_k,
                         score_threshold=threshold
                     )
-                    
+
                     st.markdown("---")
-                    st.markdown("### 🎯 Search Results")
-                    
+                    st.markdown(f"### 🎯 Search Results (Face {selected_face_idx + 1})")
+
                     if matches:
                         for idx, match in enumerate(matches):
                             with st.expander(f"Match {idx + 1} - Similarity: {match['score']:.4f}"):
@@ -397,7 +412,7 @@ PINECONE_INDEX_NAME=face-recognition-index
                                     st.json(match['metadata'])
                     else:
                         st.info("No matches found above the similarity threshold.")
-                    
+
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
     else:
@@ -411,11 +426,11 @@ def render_face_registration(model_name):
     """Render the face registration feature."""
     st.markdown("## ➕ Register Face")
     st.markdown("Add a new face to your Pinecone database.")
-    
+
     if not st.session_state.pinecone_helper:
         st.warning("⚠️ Pinecone is not configured. Please add your API key to the `.env` file and restart the app.")
         return
-    
+
     # Choose input method
     st.markdown("### 📷 Choose Input Method")
     input_method = st.radio(
@@ -424,79 +439,96 @@ def render_face_registration(model_name):
         horizontal=True,
         label_visibility="collapsed"
     )
-    
+
     img_path = None
-    
+
     # File upload method
     if input_method == "📁 Upload Image File":
         uploaded_file = st.file_uploader("Upload Face Image", type=['jpg', 'jpeg', 'png'], key="register_img")
         if uploaded_file:
             img_path = save_uploaded_file(uploaded_file)
-    
+
     # Camera capture method
     else:
         st.markdown("📸 **Camera Capture**")
         st.caption("Click the camera button below to capture a photo")
-        
+
         camera_photo = st.camera_input("Take a picture", key="camera_register")
-        
+
         if camera_photo:
             img_path = save_uploaded_file(camera_photo)
-    
+
     # Process the captured/uploaded image
     if img_path:
         col1, col2 = st.columns([1, 1])
-        
+
         with col1:
             st.markdown("### 📸 Image to Register")
             display_image_with_info(img_path)
-        
+
+        try:
+            face_candidates = extract_embeddings(img_path, model_name=model_name)
+        except Exception as e:
+            st.error(f"❌ Error detecting faces: {str(e)}")
+            return
+
+        selected_face_idx = 0
+        if len(face_candidates) > 1:
+            st.info(f"Detected **{len(face_candidates)}** faces. Please select one to register.")
+            selected_face_idx = st.selectbox(
+                "Choose a face",
+                options=list(range(len(face_candidates))),
+                format_func=lambda idx: f"Face {idx + 1}",
+                key="register_face_selector"
+            )
+
+        selected_face = face_candidates[selected_face_idx]
+
         with col2:
             st.markdown("### 📝 Face Information")
-            
+
             # Metadata inputs
             face_id = st.text_input("Face ID (leave empty for auto-generation)", "")
             person_name = st.text_input("Person Name", "")
             notes = st.text_area("Additional Notes", "")
-            
+
             if st.button("➕ Register Face", type="primary"):
                 with st.spinner("Registering face..."):
                     try:
-                        # Extract embedding
-                        embedding, facial_area = extract_embedding(img_path, model_name=model_name)
-                        
                         # Generate ID if not provided
                         if not face_id:
                             face_id = f"face_{uuid.uuid4().hex[:8]}"
-                        
+
                         # Prepare metadata
                         metadata = {
                             "name": person_name,
                             "notes": notes,
                             "registered_at": datetime.now().isoformat(),
                             "model": model_name,
-                            "capture_method": "camera" if input_method == "📸 Use Camera" else "upload"
+                            "capture_method": "camera" if input_method == "📸 Use Camera" else "upload",
+                            "source_face_index": selected_face_idx,
+                            "source_faces_detected_count": len(face_candidates)
                         }
-                        
+
                         # Register in Pinecone
                         success = st.session_state.pinecone_helper.register_face(
-                            embedding=embedding,
+                            embedding=selected_face["embedding"],
                             face_id=face_id,
                             metadata=metadata
                         )
-                        
+
                         if success:
                             st.success(f"✅ Face registered successfully with ID: `{face_id}`")
                             st.balloons()
-                            
+
                             with st.expander("📋 Registration Details"):
                                 st.json({
                                     "face_id": face_id,
-                                    "embedding_dimension": len(embedding),
-                                    "facial_area": facial_area,
+                                    "embedding_dimension": len(selected_face["embedding"]),
+                                    "facial_area": selected_face["facial_area"],
                                     "metadata": metadata
                                 })
-                        
+
                     except Exception as e:
                         st.error(f"❌ Error: {str(e)}")
     else:
