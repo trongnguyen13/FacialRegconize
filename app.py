@@ -485,28 +485,18 @@ def render_face_registration(model_name):
     if img_path:
         col1, col2 = st.columns([1, 1])
 
+        register_source_key = "register_face_source"
+        register_faces_key = "register_face_candidates"
+        register_source_signature = f"{img_path}:{model_name}"
+
+        if st.session_state.get(register_source_key) != register_source_signature:
+            st.session_state.pop(register_faces_key, None)
+            st.session_state.pop("register_face_selector", None)
+            st.session_state[register_source_key] = register_source_signature
+
         with col1:
             st.markdown("### 📸 Image to Register")
             display_image_with_info(img_path)
-
-        try:
-            face_candidates = get_or_extract_face_candidates("register", img_path, model_name)
-        except Exception as e:
-            st.error(f"❌ Error detecting faces: {str(e)}")
-            return
-
-        selected_face_idx = 0
-        if len(face_candidates) > 1:
-            st.info(f"Detected **{len(face_candidates)}** faces. Please select one to register.")
-            selected_face_idx = st.selectbox(
-                "Choose a face",
-                options=list(range(len(face_candidates))),
-                format_func=lambda idx: f"Face {idx + 1}",
-                key="register_face_selector"
-            )
-
-        selected_face = face_candidates[selected_face_idx]
-        st.caption(f"Selected face area: {selected_face.get('facial_area', {})}")
 
         with col2:
             st.markdown("### 📝 Face Information")
@@ -516,9 +506,36 @@ def render_face_registration(model_name):
             person_name = st.text_input("Person Name", "")
             notes = st.text_area("Additional Notes", "")
 
+            face_candidates = st.session_state.get(register_faces_key)
+            selected_face_idx = 0
+
+            if face_candidates and len(face_candidates) > 1:
+                st.info(f"Detected **{len(face_candidates)}** faces. Please select one to register.")
+                selected_face_idx = st.selectbox(
+                    "Choose a face",
+                    options=list(range(len(face_candidates))),
+                    format_func=lambda idx: f"Face {idx + 1}",
+                    key="register_face_selector"
+                )
+
+            if face_candidates:
+                st.caption(
+                    f"Selected face area: {face_candidates[selected_face_idx].get('facial_area', {})}"
+                )
+
             if st.button("➕ Register Face", type="primary"):
                 with st.spinner("Registering face..."):
                     try:
+                        if not face_candidates:
+                            face_candidates = extract_embeddings(img_path, model_name=model_name)
+                            st.session_state[register_faces_key] = face_candidates
+
+                            if len(face_candidates) > 1:
+                                st.info("Detected multiple faces. Select one and click **Register Face** again.")
+                                st.rerun()
+
+                        selected_face = face_candidates[selected_face_idx]
+
                         # Generate ID if not provided
                         if not face_id:
                             face_id = f"face_{uuid.uuid4().hex[:8]}"
@@ -544,6 +561,7 @@ def render_face_registration(model_name):
                         if success:
                             st.success(f"✅ Face registered successfully with ID: `{face_id}`")
                             st.balloons()
+                            st.session_state.pop(register_faces_key, None)
 
                             with st.expander("📋 Registration Details"):
                                 st.json({
