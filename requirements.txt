@@ -1,0 +1,23 @@
+# Core Web Framework
+streamlit>=1.32.0
+
+# Face Recognition and Analysis
+deepface>=0.0.93
+
+# Vector Database
+pinecone>=3.0.0
+
+# Environment Configuration
+python-dotenv>=1.0.0
+
+# Image Processing
+opencv-python>=4.9.0
+pillow>=10.2.0
+
+# Data Processing
+numpy>=1.26.0
+pandas>=2.2.0
+
+# Additional deepface dependencies (usually auto-installed, but listed for clarity)
+tensorflow>=2.15.0
+keras>=3.0.0
