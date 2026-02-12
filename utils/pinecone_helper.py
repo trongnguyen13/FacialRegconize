@@ -165,19 +165,34 @@ class PineconeHelper:
         except Exception as e:
             raise Exception(f"Failed to get stats: {str(e)}")
     
-    def list_all_faces(self) -> List[str]:
+    def list_all_faces(self) -> List[Dict]:
         """
-        List all face IDs in the index.
-        Note: This is a simplified version. For production, you'd need pagination.
-        
+        List all face entries in the index with their metadata.
+
         Returns:
-            List of face IDs
+            List of dicts with id and metadata for each entry
         """
         try:
-            # Note: Pinecone doesn't have a direct "list all" method
-            # This is a workaround - in production you'd maintain a separate list
-            # For now, we'll return an empty list and recommend tracking IDs separately
-            return []
+            all_ids = []
+            for id_list in self.index.list():
+                all_ids.extend(id_list)
+
+            if not all_ids:
+                return []
+
+            # Fetch metadata in batches of 100
+            results = []
+            for i in range(0, len(all_ids), 100):
+                batch = all_ids[i:i + 100]
+                fetch_response = self.index.fetch(ids=batch)
+                for vid, vector_data in fetch_response.vectors.items():
+                    results.append({
+                        "id": vid,
+                        "metadata": vector_data.metadata or {}
+                    })
+
+            return results
+
         except Exception as e:
             raise Exception(f"Failed to list faces: {str(e)}")
 

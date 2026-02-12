@@ -38,7 +38,7 @@ def save_uploaded_file(uploaded_file) -> str:
         raise Exception(f"Failed to save uploaded file: {str(e)}")
 
 
-def display_image_with_info(image_path: str, caption: str = "", width: Optional[int] = 300):
+def display_image_with_info(image_path: str, caption: str = "", width: Optional[int] = None):
     """
     Display an image in Streamlit with optional caption.
     
@@ -49,7 +49,10 @@ def display_image_with_info(image_path: str, caption: str = "", width: Optional[
     """
     try:
         image = Image.open(image_path)
-        st.image(image, caption=caption, width=width)
+        if width:
+            st.image(image, caption=caption, width=width)
+        else:
+            st.image(image, caption=caption, use_container_width=True)
     except Exception as e:
         st.error(f"Failed to display image: {str(e)}")
 
