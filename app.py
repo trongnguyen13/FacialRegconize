@@ -509,6 +509,15 @@ def render_face_registration(model_name):
             face_candidates = st.session_state.get(register_faces_key)
             selected_face_idx = 0
 
+            if st.button("🔍 Detect Faces"):
+                with st.spinner("Detecting faces..."):
+                    try:
+                        face_candidates = extract_embeddings(img_path, model_name=model_name)
+                        st.session_state[register_faces_key] = face_candidates
+                    except Exception as e:
+                        st.error(f"❌ Error detecting faces: {str(e)}")
+                        face_candidates = None
+
             if face_candidates and len(face_candidates) > 1:
                 st.info(f"Detected **{len(face_candidates)}** faces. Please select one to register.")
                 selected_face_idx = st.selectbox(
@@ -522,18 +531,12 @@ def render_face_registration(model_name):
                 st.caption(
                     f"Selected face area: {face_candidates[selected_face_idx].get('facial_area', {})}"
                 )
+            else:
+                st.caption("Run **Detect Faces** once before registration to select the target face.")
 
-            if st.button("➕ Register Face", type="primary"):
+            if st.button("➕ Register Face", type="primary", disabled=not face_candidates):
                 with st.spinner("Registering face..."):
                     try:
-                        if not face_candidates:
-                            face_candidates = extract_embeddings(img_path, model_name=model_name)
-                            st.session_state[register_faces_key] = face_candidates
-
-                            if len(face_candidates) > 1:
-                                st.info("Detected multiple faces. Select one and click **Register Face** again.")
-                                st.rerun()
-
                         selected_face = face_candidates[selected_face_idx]
 
                         # Generate ID if not provided
